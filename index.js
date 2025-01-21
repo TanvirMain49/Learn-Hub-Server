@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 // middle ware
@@ -47,6 +47,14 @@ async function run() {
         //! || Session get method ||
         app.get('/session', async(req, res)=>{
             const result = await sessionCollection.find().toArray();
+            res.send(result)
+        }) 
+
+        //! || Session get by id method ||
+        app.get('/session/:id', async(req, res)=>{
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const result = await sessionCollection.findOne(query);
             res.send(result)
         }) 
 
