@@ -56,6 +56,14 @@ async function run() {
             const query = {_id: new ObjectId(id)};
             const result = await sessionCollection.findOne(query);
             res.send(result)
+        })
+
+        //! || Session get by email method ||
+        app.get('/personalSession/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {tutorEmail: email};
+            const result = await sessionCollection.find(query).toArray();
+            res.send(result)
         }) 
 
 
