@@ -34,8 +34,11 @@ async function run() {
 
         //*-----------|| All Api collection ||----------
         const sessionCollection = client.db("LearnHub").collection('sessions');
+        const materialCollection = client.db("LearnHub").collection('materials');
 
         //* ------------|| Api creation ||----------
+
+        //* ------------|| Session Api ||----------
         
         //! || Session post method ||
         app.post('/session', async(req, res)=>{
@@ -64,7 +67,16 @@ async function run() {
             const query = {tutorEmail: email};
             const result = await sessionCollection.find(query).toArray();
             res.send(result)
-        }) 
+        })
+        
+        //* ------------|| Material Api ||----------
+
+         //! || material post method ||
+         app.post('/materials', async(req, res)=>{
+            const material = req.body;
+            const result = await materialCollection.insertOne(material);
+            res.send(result);
+         })
 
 
     } finally {
