@@ -74,11 +74,50 @@ async function run() {
          //! || material post method ||
          app.post('/materials', async(req, res)=>{
             const material = req.body;
+            const email = req.query.email;
+            const id = req.query.id;
+            const query = {email: email, sessionId: id};
+            const existing = await materialCollection.findOne(query);
+            if(existing){
+                return res.status(400).send({message: "Card Already exist"})
+            }
             const result = await materialCollection.insertOne(material);
             res.send(result);
          })
 
+         //! || material get by id method ||
+        //  app.get('/materials/:id', async(req, res)=>{
+        //     const id = req.params.id;
+        //     const query = {_id: new ObjectId(id)};
+        //     console.log(query);
+        //     const result = await materialCollection.findOne(query);
+        //     console.log(result);
+        //     res.send(result);
+        //  })
 
+        //  //! || material get by email and id method ||
+         app.get('/materialItem/:email', async(req, res)=>{
+            const email = req.params.email;
+            const id = req.query.id;
+            const query = {email: email, sessionId: id };
+            const result = await materialCollection.findOne(query);
+            res.send(result);
+         })
+
+         //! || material patch id method ||
+         app.patch('/materials/:id', async(req, res)=>{
+            const id = req.params.id;
+            const material = req.body;
+            const filter = {sessionId: id};
+            const updateDoc = {
+                $set:{
+                    doc: material.doc,
+                    image: material.image
+                }
+            }
+            const result = await materialCollection.updateOne(filter, updateDoc);
+            res.send(result);
+         })
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
