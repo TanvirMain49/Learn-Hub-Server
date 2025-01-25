@@ -35,6 +35,7 @@ async function run() {
         const sessionCollection = client.db("LearnHub").collection('sessions');
         const materialCollection = client.db("LearnHub").collection('materials');
         const userCollection = client.db("LearnHub").collection('users');
+        const notesCollection = client.db("LearnHub").collection('notes');
 
 
         //*-----------|| JWT Api ||----------
@@ -48,12 +49,12 @@ async function run() {
         const verifyToken = (req, res, next) => {
             // console.log('from verifyToken', req.headers);
             if (!req.headers?.authorization) {
-                return res.status(401).send({ message: "unauthorize access" })
+                return res.status(401).send({ message: "unauthorize access" });
             }
             const token = req.headers.authorization.split(' ')[1];
             jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
                 if (err) {
-                    res.status(401).send({ message: "unauthorized access" });
+                    return res.status(401).send({ message: "unauthorized access" });
                 }
                 req.decoded = decoded;
                 next();
@@ -61,8 +62,26 @@ async function run() {
         }
 
         //* ------------|| User Api ||----------
-        app.post('/user', async(req, res)=>{
+
+        //! -------- || see which role user is method || -----
+        app.get('/user/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {email: email};
+            const user = await userCollection.findOne(query);
+            if (user) { 
+                res.send({role: user.role})
+            }
+        })
+
+        //! || User post method ||
+        app.post('/users', async(req, res)=>{
             const userInfo = req.body;
+            const email = req.query.email;
+            const query = {email: email}; 
+            const user = await userCollection.findOne(query);
+            if(user){
+                return res.send({message:'User exist'});
+            }
             const result = await userCollection.insertOne(userInfo);
             res.send(result)
         })
@@ -157,6 +176,29 @@ async function run() {
             res.send(result)
         })
 
+        //* ------------|| Note Api ||----------
+        // !note post method  || 
+        app.post('/notes', async (req, res) => {
+            const note = req.body;
+            const result = await notesCollection.insertOne(note);
+            res.send(result);
+        })
+
+        // !note get method  || 
+        app.get('/notes/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {email: email};
+            const result = await notesCollection.find(query).toArray();
+            res.send(result);
+        })
+
+        // !note get by id method  ||
+        app.get('/note/:id', async(req, res)=>{
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const result = await notesCollection.findOne(query);
+            res.send(result);
+        }) 
 
     } finally {
         // Ensures that the client will close when you finish/error
