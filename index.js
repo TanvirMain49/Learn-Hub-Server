@@ -2,6 +2,7 @@ require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const express = require('express');
 const cors = require('cors');
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
@@ -36,6 +37,8 @@ async function run() {
         const materialCollection = client.db("LearnHub").collection('materials');
         const userCollection = client.db("LearnHub").collection('users');
         const notesCollection = client.db("LearnHub").collection('notes');
+        const paymentCollection = client.db("LearnHub").collection('payments');
+        const bookedCollection = client.db("LearnHub").collection('bookedSession');
 
 
         //*-----------|| JWT Api ||----------
@@ -61,26 +64,55 @@ async function run() {
             })
         }
 
+        //*-----------|| Payment Api ||----------
+
+        // !create Payment Intent method
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body;
+            const amount = price * 100;
+            if (amount < 50) { // Stripe minimum for USD is $0.50
+                return res.status(400).send({ message: "Amount must be at least $0.50" });
+            }
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                "payment_method_types": ["card"],
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+        })
+
+         // !payment post method ||
+         app.post('/sessionPayments', async(req, res)=>{
+            const payment = req.body;
+            console.log(payment);
+            const result = await paymentCollection.insertOne(payment);
+            console.log(result);
+            res.send(result);
+         })
+
+
         //* ------------|| User Api ||----------
 
         //! -------- || see which role user is method || -----
-        app.get('/user/:email', async(req, res)=>{
+        app.get('/user/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email: email};
+            const query = { email: email };
             const user = await userCollection.findOne(query);
-            if (user) { 
-                res.send({role: user.role})
+            if (user) {
+                res.send({ role: user.role })
             }
         })
 
         //! || User post method ||
-        app.post('/users', async(req, res)=>{
+        app.post('/users', async (req, res) => {
             const userInfo = req.body;
             const email = req.query.email;
-            const query = {email: email}; 
+            const query = { email: email };
             const user = await userCollection.findOne(query);
-            if(user){
-                return res.send({message:'User exist'});
+            if (user) {
+                return res.send({ message: 'User exist' });
             }
             const result = await userCollection.insertOne(userInfo);
             res.send(result)
@@ -185,20 +217,36 @@ async function run() {
         })
 
         // !note get method  || 
-        app.get('/notes/:email', async(req, res)=>{
+        app.get('/notes/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email: email};
+            const query = { email: email };
             const result = await notesCollection.find(query).toArray();
             res.send(result);
         })
 
         // !note get by id method  ||
-        app.get('/note/:id', async(req, res)=>{
+        app.get('/note/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const result = await notesCollection.findOne(query);
             res.send(result);
-        }) 
+        })
+
+        //* ------------|| Booked Api ||----------
+
+        // !note get by id method  ||
+        app.post('/bookedSession', async(req, res)=>{
+            const booked = req.body;
+            const email = req.query.email;
+            const sessionId = req.query.id;
+            const query = {email: email, sessionId: sessionId }
+            const exist = await bookedCollection.findOne(query)
+            if(exist){
+                return res.status(400).send({message: "Already Booked"})
+            }
+            const result = await bookedCollection.insertOne(booked);
+            res.send(result);
+        })
 
     } finally {
         // Ensures that the client will close when you finish/error
