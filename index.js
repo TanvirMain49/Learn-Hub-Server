@@ -143,7 +143,6 @@ async function run() {
 
         //! || Session get by email method ||
         app.get('/personalSession/:email', verifyToken, async (req, res) => {
-            // console.log(req.headers);
             const email = req.params.email;
             const query = { tutorEmail: email };
             const result = await sessionCollection.find(query).toArray();
@@ -167,14 +166,12 @@ async function run() {
         })
 
         //! || material get by id method ||
-        //  app.get('/materials/:id', async(req, res)=>{
-        //     const id = req.params.id;
-        //     const query = {_id: new ObjectId(id)};
-        //     console.log(query);
-        //     const result = await materialCollection.findOne(query);
-        //     console.log(result);
-        //     res.send(result);
-        //  })
+         app.get('/materials/:id', async(req, res)=>{
+            const id = req.params.id;
+            const query = {sessionId: id};
+            const result = await materialCollection.findOne(query);
+            console.log(result);
+         })
 
         //  //! || material get by email and id method ||
         //  app.get('/materialItem/:email', async(req, res)=>{
@@ -246,6 +243,12 @@ async function run() {
             }
             const result = await bookedCollection.insertOne(booked);
             res.send(result);
+        })
+        app.get('/bookedSession/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const result = await bookedCollection.find(query).toArray();
+            res.send(result)
         })
 
     } finally {
