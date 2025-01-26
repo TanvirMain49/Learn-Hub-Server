@@ -83,14 +83,14 @@ async function run() {
             })
         })
 
-         // !payment post method ||
-         app.post('/sessionPayments', async(req, res)=>{
+        // !payment post method ||
+        app.post('/sessionPayments', async (req, res) => {
             const payment = req.body;
             console.log(payment);
             const result = await paymentCollection.insertOne(payment);
             console.log(result);
             res.send(result);
-         })
+        })
 
 
         //* ------------|| User Api ||----------
@@ -166,12 +166,12 @@ async function run() {
         })
 
         //! || material get by id method ||
-         app.get('/materials/:id', async(req, res)=>{
+        app.get('/materials/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {sessionId: id};
+            const query = { sessionId: id };
             const result = await materialCollection.findOne(query);
-            console.log(result);
-         })
+            res.send(result);
+        })
 
         //  //! || material get by email and id method ||
         //  app.get('/materialItem/:email', async(req, res)=>{
@@ -206,6 +206,7 @@ async function run() {
         })
 
         //* ------------|| Note Api ||----------
+
         // !note post method  || 
         app.post('/notes', async (req, res) => {
             const note = req.body;
@@ -227,23 +228,44 @@ async function run() {
             const query = { _id: new ObjectId(id) };
             const result = await notesCollection.findOne(query);
             res.send(result);
+            
+        })
+
+        // !note update ||
+        app.patch('/notes/:id', async (req, res) => {
+            const note = req.body;
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = { $set: note };
+            const result = await notesCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
+
+        // !note delete ||
+        app.delete('/notes/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await notesCollection.deleteOne(filter);
+            res.send(result);
         })
 
         //* ------------|| Booked Api ||----------
 
-        // !note get by id method  ||
-        app.post('/bookedSession', async(req, res)=>{
+        // !booked post (no duplicate) method  ||
+        app.post('/bookedSession', async (req, res) => {
             const booked = req.body;
             const email = req.query.email;
             const sessionId = req.query.id;
-            const query = {email: email, sessionId: sessionId }
+            const query = { email: email, sessionId: sessionId }
             const exist = await bookedCollection.findOne(query)
-            if(exist){
-                return res.status(400).send({message: "Already Booked"})
+            if (exist) {
+                return res.status(400).send({ message: "Already Booked" })
             }
             const result = await bookedCollection.insertOne(booked);
             res.send(result);
         })
+
+        // !booked get by email method  ||
         app.get('/bookedSession/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             const query = { email: email };
