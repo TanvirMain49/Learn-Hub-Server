@@ -105,6 +105,29 @@ async function run() {
             }
         })
 
+        //! || User get(All) and search method ||
+        app.get('/users', async(req, res)=>{
+            const search = req.query.search;
+            let query = {
+                $or:[
+                    {
+                        name: {
+                            $regex: search,
+                            $options: 'i'
+                        }
+                    },
+                    {
+                        email: {
+                            $regex: search,
+                            $options: 'i'
+                        }
+                    },
+                ]
+            }
+            const result = await userCollection.find(query).toArray();
+            res.send(result);
+        })
+
         //! || User post method ||
         app.post('/users', async (req, res) => {
             const userInfo = req.body;
@@ -116,6 +139,26 @@ async function run() {
             }
             const result = await userCollection.insertOne(userInfo);
             res.send(result)
+        })
+
+        app.patch('/users/:id', async(req, res)=>{
+            const id = req.params.id;
+            const {role} = req.body;
+            const filter = { _id: new ObjectId(id)};
+            const updatedDoc = {
+                $set:{
+                    role : role
+                }
+            }
+            const result = await userCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
+
+        app.delete('/users/:id', async(req, res)=>{
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const result = await userCollection.deleteOne(query);
+            res.send(result);
         })
 
         //* ------------|| Session Api ||----------
