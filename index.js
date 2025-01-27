@@ -1,10 +1,10 @@
 require('dotenv').config();
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const express = require('express');
 const cors = require('cors');
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const app = express();
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 // middle ware
@@ -26,10 +26,10 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
         //*-----------|| All Api collection ||----------
@@ -189,6 +189,23 @@ async function run() {
             const email = req.params.email;
             const query = { tutorEmail: email };
             const result = await sessionCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.patch('/session/:id', async(req, res)=>{
+            const id = req.params.id;
+            const status = req.body;
+            const filter = {_id: new ObjectId(id)};
+            console.log(status);
+            const updatedDoc = {
+                $set :{
+                    status: status.status,
+                    price: status.price || '0',
+                    feedback: status.feedback || " "
+                }
+            }
+            const options = { upsert: true };
+            const result = await sessionCollection.updateOne(filter, updatedDoc, options)
             res.send(result)
         })
 
