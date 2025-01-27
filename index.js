@@ -230,6 +230,12 @@ async function run() {
         })
 
         //! || material get by id method ||
+        app.get('/allMaterial', async (req, res) => {
+            const result = await materialCollection.find().toArray();
+            res.send(result);
+        })
+
+        //! || material get by id method ||
         app.get('/materialStudent/:id', async (req, res) => {
             const id = req.params.id;
             const query = { sessionId: id};
@@ -262,6 +268,14 @@ async function run() {
 
         //! || material delete method ||
         app.delete('/materials/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await materialCollection.deleteOne(query);
+            res.send(result);
+        })
+
+        //! || material Admin delete method ||
+        app.delete('/AdminMaterials/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await materialCollection.deleteOne(query);
