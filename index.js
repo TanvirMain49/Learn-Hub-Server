@@ -50,7 +50,6 @@ async function run() {
 
         //*-----------|| Middleware ||----------
         const verifyToken = (req, res, next) => {
-            // console.log('from verifyToken', req.headers);
             if (!req.headers?.authorization) {
                 return res.status(401).send({ message: "unauthorize access" });
             }
@@ -86,9 +85,7 @@ async function run() {
         // !payment post method ||
         app.post('/sessionPayments', async (req, res) => {
             const payment = req.body;
-            console.log(payment);
             const result = await paymentCollection.insertOne(payment);
-            console.log(result);
             res.send(result);
         })
 
@@ -196,7 +193,6 @@ async function run() {
             const id = req.params.id;
             const status = req.body;
             const filter = {_id: new ObjectId(id)};
-            console.log(status);
             const updatedDoc = {
                 $set :{
                     status: status.status,
@@ -226,21 +222,28 @@ async function run() {
         })
 
         //! || material get by id method ||
-        app.get('/materials/:id', async (req, res) => {
+        app.get('/material/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { sessionId: id };
+            const query = { _id: new ObjectId(id)};
             const result = await materialCollection.findOne(query);
             res.send(result);
         })
 
-        //  //! || material get by email and id method ||
-        //  app.get('/materialItem/:email', async(req, res)=>{
-        //     const email = req.params.email;
-        //     const id = req.query.id;
-        //     const query = {email: email, sessionId: id };
-        //     const result = await materialCollection.findOne(query);
-        //     res.send(result);
-        //  })
+        //! || material get by id method ||
+        app.get('/materialStudent/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { sessionId: id};
+            const result = await materialCollection.findOne(query);
+            res.send(result);
+        })
+
+        //  //! || material get by email  method ||
+         app.get('/materialItems/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {email: email};
+            const result = await materialCollection.find(query).toArray();
+            res.send(result);
+         })
 
         //! || material patch id method ||
         app.patch('/materials/:id', async (req, res) => {
@@ -261,8 +264,8 @@ async function run() {
         app.delete('/materials/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
-            const result = await sessionCollection.deleteOne(query);
-            res.send(result)
+            const result = await materialCollection.deleteOne(query);
+            res.send(result);
         })
 
         //* ------------|| Note Api ||----------
