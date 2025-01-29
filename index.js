@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require('express');
 const cors = require('cors');
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
@@ -28,7 +28,7 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
@@ -39,6 +39,7 @@ async function run() {
         const notesCollection = client.db("LearnHub").collection('notes');
         const paymentCollection = client.db("LearnHub").collection('payments');
         const bookedCollection = client.db("LearnHub").collection('bookedSession');
+        const reviewCollection = client.db("LearnHub").collection('review');
 
 
         //*-----------|| JWT Api ||----------
@@ -50,6 +51,7 @@ async function run() {
 
         //*-----------|| Middleware ||----------
         const verifyToken = (req, res, next) => {
+            console.log(req.headers);
             if (!req.headers?.authorization) {
                 return res.status(401).send({ message: "unauthorize access" });
             }
@@ -61,6 +63,28 @@ async function run() {
                 req.decoded = decoded;
                 next();
             })
+        }
+
+        const verifyTutor = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { tutorEmail: email }
+            const user = await userCollection.findOne(query);
+            const isTutor = user?.role === "Tutor"
+            console.log(isTutor);
+            if (!isTutor) {
+                return res.status(403).send({ message: "unauthorize access" });
+            }
+            next();
+        }
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await userCollection.findOne(query);
+            const isAdmin = user?.role === "Admin"
+            if (!isAdmin) {
+                return res.status(403).send({ message: "unauthorize access" });
+            }
+            next();
         }
 
         //*-----------|| Payment Api ||----------
@@ -93,7 +117,7 @@ async function run() {
         //* ------------|| User Api ||----------
 
         //! -------- || see which role user is method || -----
-        app.get('/user/:email', async (req, res) => {
+        app.get('/user/:email',  async (req, res) => {
             const email = req.params.email;
             const query = { email: email };
             const user = await userCollection.findOne(query);
@@ -103,10 +127,11 @@ async function run() {
         })
 
         //! || User get(All) and search method ||
-        app.get('/users', async(req, res)=>{
+        app.get('/users', verifyToken, verifyAdmin,  async (req, res) => {
+            console.log(req.headers);
             const search = req.query.search;
             let query = {
-                $or:[
+                $or: [
                     {
                         name: {
                             $regex: search,
@@ -138,22 +163,22 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/users/:id', async(req, res)=>{
+        app.patch('/users/:id', async (req, res) => {
             const id = req.params.id;
-            const {role} = req.body;
-            const filter = { _id: new ObjectId(id)};
+            const { role } = req.body;
+            const filter = { _id: new ObjectId(id) };
             const updatedDoc = {
-                $set:{
-                    role : role
+                $set: {
+                    role: role
                 }
             }
             const result = await userCollection.updateOne(filter, updatedDoc);
             res.send(result);
         })
 
-        app.delete('/users/:id', async(req, res)=>{
+        app.delete('/users/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const result = await userCollection.deleteOne(query);
             res.send(result);
         })
@@ -169,12 +194,18 @@ async function run() {
 
         //! || Session get method ||
         app.get('/session', async (req, res) => {
-            const result = await sessionCollection.find().toArray();
+            console.log(req.headers);
+            const page = req.query.page;
+            const limit = Number(req.query.limit);
+            const result = await sessionCollection.find()
+                .skip(page * limit)
+                .limit(limit)
+                .toArray();
             res.send(result)
         })
 
         //! || Session get by id method ||
-        app.get('/session/:id', async (req, res) => {
+        app.get('/session/:id', async(req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await sessionCollection.findOne(query);
@@ -182,19 +213,24 @@ async function run() {
         })
 
         //! || Session get by email method ||
-        app.get('/personalSession/:email', verifyToken, async (req, res) => {
+        app.get('/personalSession/:email', async (req, res) => {
             const email = req.params.email;
             const query = { tutorEmail: email };
             const result = await sessionCollection.find(query).toArray();
             res.send(result)
         })
-
-        app.patch('/session/:id', async(req, res)=>{
+        app.get('/sessionCount', async (req, res) => {
+            const count = await sessionCollection.estimatedDocumentCount();
+            res.send({ count })
+        })
+        
+        // !admin
+        app.patch('/session/:id', async(req, res) => {
             const id = req.params.id;
             const status = req.body;
-            const filter = {_id: new ObjectId(id)};
+            const filter = { _id: new ObjectId(id) };
             const updatedDoc = {
-                $set :{
+                $set: {
                     status: status.status,
                     price: status.price || '0',
                     feedback: status.feedback || " "
@@ -204,6 +240,21 @@ async function run() {
             const result = await sessionCollection.updateOne(filter, updatedDoc, options)
             res.send(result)
         })
+        // !
+        app.patch('/sessionReq/:id', async (req, res) => {
+            const id = req.params.id;
+            const status = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    status: status.status,
+                }
+            }
+            const options = { upsert: true };
+            const result = await sessionCollection.updateOne(filter, updatedDoc, options)
+            res.send(result)
+        })
+
 
         //* ------------|| Material Api ||----------
 
@@ -224,12 +275,12 @@ async function run() {
         //! || material get by id method ||
         app.get('/material/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const result = await materialCollection.findOne(query);
             res.send(result);
         })
 
-        //! || material get by id method ||
+        //! || material get  method ||
         app.get('/allMaterial', async (req, res) => {
             const result = await materialCollection.find().toArray();
             res.send(result);
@@ -238,18 +289,18 @@ async function run() {
         //! || material get by id method ||
         app.get('/materialStudent/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { sessionId: id};
+            const query = { sessionId: id };
             const result = await materialCollection.findOne(query);
             res.send(result);
         })
 
         //  //! || material get by email  method ||
-         app.get('/materialItems/:email', async(req, res)=>{
+        app.get('/materialItems/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email: email};
+            const query = { email: email };
             const result = await materialCollection.find(query).toArray();
             res.send(result);
-         })
+        })
 
         //! || material patch id method ||
         app.patch('/materials/:id', async (req, res) => {
@@ -285,7 +336,7 @@ async function run() {
         //* ------------|| Note Api ||----------
 
         // !note post method  || 
-        app.post('/notes', async (req, res) => {
+        app.post('/notes', async(req, res) => {
             const note = req.body;
             const result = await notesCollection.insertOne(note);
             res.send(result);
@@ -305,7 +356,7 @@ async function run() {
             const query = { _id: new ObjectId(id) };
             const result = await notesCollection.findOne(query);
             res.send(result);
-            
+
         })
 
         // !note update ||
@@ -343,13 +394,24 @@ async function run() {
         })
 
         // !booked get by email method  ||
-        app.get('/bookedSession/:email', verifyToken, async (req, res) => {
+        app.get('/bookedSession/:email', async (req, res) => {
             const email = req.params.email;
             const query = { email: email };
             const result = await bookedCollection.find(query).toArray();
             res.send(result)
         })
 
+        //* ------------|| Review Api ||----------
+        app.post('/reviews', async(req, res)=>{
+            const review = req.body;
+            const result = await reviewCollection.insertOne(review);
+            res.send(result);
+        })
+
+        app.get("/reviews", async (req, res) => {
+                const result = await reviewCollection.find().toArray();
+                res.send(result);
+        });
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
