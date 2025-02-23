@@ -51,7 +51,6 @@ async function run() {
 
         //*-----------|| Middleware ||----------
         const verifyToken = (req, res, next) => {
-            console.log(req.headers);
             if (!req.headers?.authorization) {
                 return res.status(401).send({ message: "unauthorize access" });
             }
@@ -70,7 +69,6 @@ async function run() {
             const query = { tutorEmail: email }
             const user = await userCollection.findOne(query);
             const isTutor = user?.role === "Tutor"
-            console.log(isTutor);
             if (!isTutor) {
                 return res.status(403).send({ message: "unauthorize access" });
             }
@@ -106,6 +104,40 @@ async function run() {
             })
         })
 
+        app.get('/total-revenue', async (req, res) => {
+            const totalRevenue = await paymentCollection.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: "$price" }
+                    }
+                }
+            ]).toArray()
+            const total = totalRevenue[0]?.total || 0;
+            res.json({ total });
+        })
+
+        app.get('/total-revenue-by-month', async (req, res) => {
+            const revenueByMonth = await paymentCollection.aggregate([
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: {
+                                format: "%Y-%m",
+                                date: { $toDate: "$date" }
+                            }
+                        },
+                        total: { $sum: "$price" }
+                    }
+                },
+                {
+                    $sort: { _id: 1 }
+                }
+            ]).toArray();
+            res.json(revenueByMonth);
+        })
+
+
         // !payment post method ||
         app.post('/sessionPayments', async (req, res) => {
             const payment = req.body;
@@ -113,11 +145,16 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/payment', async (req, res) => {
+            const result = await paymentCollection.find().toArray();
+            res.send(result);
+        })
+
 
         //* ------------|| User Api ||----------
 
         //! -------- || see which role user is method || -----
-        app.get('/user/:email',  async (req, res) => {
+        app.get('/user/:email', async (req, res) => {
             const email = req.params.email;
             const query = { email: email };
             const user = await userCollection.findOne(query);
@@ -127,8 +164,8 @@ async function run() {
         })
 
         //! || User get(All) and search method ||
-        app.get('/users', verifyToken, verifyAdmin,  async (req, res) => {
-            console.log(req.headers);
+        app.get('/users', async (req, res) => {
+            // console.log(req.headers);
             const search = req.query.search;
             let query = {
                 $or: [
@@ -194,18 +231,47 @@ async function run() {
 
         //! || Session get method ||
         app.get('/session', async (req, res) => {
-            console.log(req.headers);
-            const page = req.query.page;
-            const limit = Number(req.query.limit);
-            const result = await sessionCollection.find()
-                .skip(page * limit)
-                .limit(limit)
-                .toArray();
-            res.send(result)
+            try {
+                
+                const { page = 0, limit = 8, sortBy = "default"} = req.query;
+                const pageNumber = parseInt(page, 10);
+                const limitNumber = parseInt(limit, 10);
+                if (isNaN(pageNumber) || pageNumber < 0) {
+                    return res.status(400).json({ error: "Invalid page value. Page must be a non-negative integer." });
+                }
+                if (isNaN(limitNumber) || limitNumber <= 0) {
+                    return res.status(400).json({ error: "Invalid limit value. Limit must be a positive integer." });
+                }
+                let sort = {};
+                if (sortBy === "price_asc") {
+                    sort = { price: 1 };
+                } else if (sortBy === "price_desc") {
+                    sort = { price: -1 };
+                } 
+                const query = { status: "success" };
+                const skip = pageNumber * limitNumber;
+                const result = await sessionCollection
+                    .find(query)
+                    .sort(sort)  
+                    .skip(skip) 
+                    .limit(limitNumber)
+                    .toArray();
+                res.json(result);
+            } catch (error) {
+                console.error("Error fetching sessions:", error);
+                res.status(500).json({ error: "Internal Server Error" });
+            }
+        });
+
+
+        //! || Session get method  admin ||
+        app.get('/sessionAdmin', async (req, res) => {
+            const result = await sessionCollection.find().toArray();
+            res.send(result);
         })
 
         //! || Session get by id method ||
-        app.get('/session/:id', async(req, res) => {
+        app.get('/session/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await sessionCollection.findOne(query);
@@ -220,12 +286,13 @@ async function run() {
             res.send(result)
         })
         app.get('/sessionCount', async (req, res) => {
-            const count = await sessionCollection.estimatedDocumentCount();
-            res.send({ count })
+            const query = { status: "success" };
+            const count = await sessionCollection.countDocuments(query);
+            res.send({ count });
         })
-        
+
         // !admin
-        app.patch('/session/:id', async(req, res) => {
+        app.patch('/session/:id', async (req, res) => {
             const id = req.params.id;
             const status = req.body;
             const filter = { _id: new ObjectId(id) };
@@ -336,13 +403,13 @@ async function run() {
         //* ------------|| Note Api ||----------
 
         // !note post method  || 
-        app.post('/notes', async(req, res) => {
+        app.post('/notes', async (req, res) => {
             const note = req.body;
             const result = await notesCollection.insertOne(note);
             res.send(result);
         })
 
-        // !note get method  || 
+        // !note get method  || ---------------
         app.get('/notes/:email', async (req, res) => {
             const email = req.params.email;
             const query = { email: email };
@@ -402,15 +469,15 @@ async function run() {
         })
 
         //* ------------|| Review Api ||----------
-        app.post('/reviews', async(req, res)=>{
+        app.post('/reviews', async (req, res) => {
             const review = req.body;
             const result = await reviewCollection.insertOne(review);
             res.send(result);
         })
 
         app.get("/reviews", async (req, res) => {
-                const result = await reviewCollection.find().toArray();
-                res.send(result);
+            const result = await reviewCollection.find().toArray();
+            res.send(result);
         });
     } finally {
         // Ensures that the client will close when you finish/error
