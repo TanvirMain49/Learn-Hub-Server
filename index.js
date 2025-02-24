@@ -159,7 +159,7 @@ async function run() {
             const query = { email: email };
             const user = await userCollection.findOne(query);
             if (user) {
-                res.send({ role: user.role })
+                res.send(user)
             }
         })
 
@@ -210,6 +210,40 @@ async function run() {
                 }
             }
             const result = await userCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
+        app.put('/userPfp/:email', async (req, res) => {
+            const email = req.params.email;
+            const info = req.body; 
+            const filter = { email: email };
+            const updateFields = {};
+            for (let key in info) {
+                if (info[key]) {
+                    updateFields[key] = info[key];
+                }
+            }
+        
+            const updatedDoc = {
+                $set: updateFields,
+            };
+        
+            const options = { upsert: true };
+            try {
+                const result = await userCollection.updateOne(filter, updatedDoc, options);
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ error: "Failed to update profile" });
+            }
+        });
+        
+        app.get('/tutor', async(req, res)=>{
+            const query = {role: 'Tutor'}
+            const result = await userCollection.find(query).toArray();
+            res.send(result);
+        })
+        app.get('/user/:email', async(req, res)=>{
+            const query = {email: req.params.email}
+            const result = await userCollection.findOne(query);
             res.send(result);
         })
 
